@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Econometric Wage Dynamics Explorer</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --navy: #111111;
+    --navy2: #181818;
+    --navy3: #202020;
+    --accent: #888888;
+    --accent2: #cccccc;
+    --gold: #b8a070;
+    --teal: #7aaa96;
+    --rose: #aa7878;
+    --muted: rgba(200,200,200,0.65);
+    --card-bg: rgba(255,255,255,0.03);
+    --card-border: rgba(255,255,255,0.08);
+    --text: #e4e4e4;
+    --text2: rgba(200,200,200,0.6);
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--navy);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.6;
+    overflow-x: hidden;
+  }
+  /* NAV */
+  nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(10,10,10,0.95);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--card-border);
+    padding: 0 2rem;
+    display: flex; align-items: center; gap: 0; height: 52px;
+    flex-wrap: wrap;
+  }
+  nav .brand { font-size: 13px; font-weight: 600; color: var(--accent2); margin-right: 2rem; white-space: nowrap; }
+  nav a { font-size: 12px; color: var(--text2); text-decoration: none; padding: 4px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; }
+  nav a:hover { background: rgba(61,142,248,0.15); color: var(--accent2); }
+  /* HERO */
+  .hero {
+    min-height: 88vh;
+    background: linear-gradient(135deg, #0a0a0a 0%, #111111 40%, #181818 100%);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 4rem 2rem 3rem;
+    position: relative; overflow: hidden;
+  }
+  .hero::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse 80% 60% at 50% 40%, rgba(255,255,255,0.03) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .grid-bg {
+    position: absolute; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+  }
+  .hero h1 {
+    font-size: clamp(1.8rem, 4vw, 3.2rem);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    background: linear-gradient(135deg, #fff 30%, #cccccc 70%, #999999 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    margin-bottom: 1rem; position: relative; z-index: 1;
+  }
+  .hero p { font-size: 1.05rem; color: var(--muted); max-width: 600px; position: relative; z-index: 1; margin-bottom: 2rem; }
+  .badge-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; position: relative; z-index: 1; }
+  .badge {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase;
+    padding: 5px 12px; border-radius: 20px; border: 1px solid;
+  }
+  .badge-blue { background: rgba(200,200,200,0.08); border-color: rgba(200,200,200,0.25); color: #cccccc; }
+  .badge-gold { background: rgba(184,160,112,0.1); border-color: rgba(184,160,112,0.3); color: #c8b080; }
+  .badge-teal { background: rgba(122,170,150,0.1); border-color: rgba(122,170,150,0.3); color: #8ec4aa; }
+  .badge-rose { background: rgba(170,120,120,0.1); border-color: rgba(170,120,120,0.3); color: #c09090; }
+  .stats-row {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+    max-width: 700px; width: 100%; margin-top: 2.5rem; position: relative; z-index: 1;
+  }
+  .stat-card {
+    background: rgba(255,255,255,0.04); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 16px 12px; text-align: center;
+  }
+  .stat-card .sv { font-size: 1.5rem; font-weight: 700; color: var(--accent2); }
+  .stat-card .sl { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .scroll-hint { margin-top: 3rem; color: var(--text2); font-size: 12px; position: relative; z-index: 1; animation: bounce 2s infinite; }
+  @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(6px)} }
+  /* SECTIONS */
+  section { padding: 3.5rem 2rem; max-width: 1000px; margin: 0 auto; }
+  .section-label { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent); margin-bottom: 8px; }
+  h2 { font-size: 1.7rem; font-weight: 700; margin-bottom: 0.5rem; letter-spacing: -0.01em; }
+  h3 { font-size: 1.1rem; font-weight: 600; margin-bottom: 0.5rem; }
+  .section-divider { border: none; border-top: 1px solid var(--card-border); margin: 0; }
+  /* CARDS */
+  .card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: var(--radius); padding: 1.25rem 1.5rem;
+  }
+  .card-grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .card-grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+  /* ABOUT */
+  .concept-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 1.2rem;
+    display: flex; gap: 14px; align-items: flex-start;
+  }
+  .concept-icon {
+    width: 38px; height: 38px; border-radius: 9px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+  }
+  .concept-icon.blue { background: rgba(200,200,200,0.07); }
+  .concept-icon.gold { background: rgba(184,160,112,0.1); }
+  .concept-icon.teal { background: rgba(122,170,150,0.1); }
+  .concept-icon.rose { background: rgba(170,120,120,0.1); }
+  /* CALCULATOR */
+  .calc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media(max-width:680px){ .calc-grid{grid-template-columns:1fr;} .stats-row{grid-template-columns:repeat(2,1fr);} }
+  .input-group { margin-bottom: 1.2rem; }
+  .input-group label { font-size: 12px; color: var(--text2); display: flex; justify-content: space-between; margin-bottom: 6px; }
+  .input-group label span { color: var(--accent2); font-weight: 600; }
+  input[type=range] {
+    width: 100%; accent-color: #888;
+    height: 4px; cursor: pointer; border-radius: 2px;
+  }
+  .toggle-row { display: flex; gap: 10px; }
+  .toggle-btn {
+    flex: 1; padding: 8px; border-radius: 8px; border: 1px solid var(--card-border);
+    background: transparent; color: var(--text2); font-size: 13px; cursor: pointer; transition: all 0.2s;
+  }
+  .toggle-btn.active { background: rgba(200,200,200,0.1); border-color: #888; color: var(--text); }
+  .output-primary {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 1.5rem;
+    text-align: center; margin-bottom: 16px;
+  }
+  .output-primary .label { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #999; margin-bottom: 4px; }
+  .output-primary .wage { font-size: 2.2rem; font-weight: 700; color: #fff; }
+  .output-primary .period { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .output-secondary { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .out-card { background: rgba(255,255,255,0.03); border: 1px solid var(--card-border); border-radius: 10px; padding: 12px; text-align: center; }
+  .out-card .ov { font-size: 1.1rem; font-weight: 600; color: var(--accent2); }
+  .out-card .ol { font-size: 11px; color: var(--text2); margin-top: 2px; }
+  .decomp-bar { margin-top: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.05); overflow: hidden; }
+  .decomp-fill { height: 100%; border-radius: 3px; transition: width 0.4s; }
+  .interp-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.07); border-radius: 10px; padding: 12px 14px; margin-top: 14px; }
+  .interp-card p { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+  .interp-card p + p { margin-top: 6px; }
+  /* SCENARIO */
+  .scenario-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media(max-width:600px){.scenario-grid{grid-template-columns:1fr;}}
+  .scenario-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.2rem; }
+  .scenario-card h4 { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 10px; }
+  .scenario-card .sw { font-size: 1.5rem; font-weight: 700; color: var(--accent2); }
+  .diff-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 12px; margin-top: 6px; }
+  .diff-pos { background: rgba(43,191,164,0.15); color: var(--teal); }
+  .diff-neg { background: rgba(224,92,122,0.15); color: var(--rose); }
+  .scenario-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 1.5rem; }
+  .sc-btn { padding: 7px 14px; border-radius: 20px; border: 1px solid var(--card-border); background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .sc-btn.active { background: rgba(200,200,200,0.1); border-color: #888; color: var(--accent2); }
+  /* CHARTS */
+  .chart-wrap { position: relative; width: 100%; }
+  /* REGRESSION */
+  .coeff-card {
+    background: var(--card-bg); border: 1px solid var(--card-border);
+    border-radius: 12px; padding: 1.1rem 1.3rem;
+  }
+  .coeff-card .cname { font-size: 12px; color: var(--text2); margin-bottom: 4px; }
+  .coeff-card .cval { font-size: 1.3rem; font-weight: 700; }
+  .coeff-card .cstat { font-size: 11px; color: var(--text2); margin-top: 4px; }
+  .sig-star { color: var(--gold); }
+  .cbar-wrap { height: 4px; background: rgba(255,255,255,0.05); border-radius: 2px; margin-top: 8px; }
+  .cbar { height: 100%; border-radius: 2px; }
+  /* DIAGNOSTICS */
+  .diag-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 12px; padding: 1.1rem; }
+  .diag-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .diag-status { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 10px; }
+  .status-ok { background: rgba(43,191,164,0.15); color: var(--teal); }
+  .status-warn { background: rgba(240,165,0,0.15); color: var(--gold); }
+  .status-viol { background: rgba(224,92,122,0.12); color: var(--rose); }
+  .diag-exp { font-size: 12px; color: var(--text2); line-height: 1.6; margin-top: 8px; border-top: 1px solid var(--card-border); padding-top: 8px; display: none; }
+  .diag-exp.open { display: block; }
+  .diag-toggle { font-size: 11px; color: var(--accent2); cursor: pointer; margin-top: 6px; }
+  /* CSV */
+  .drop-zone {
+    border: 2px dashed rgba(255,255,255,0.12); border-radius: 12px;
+    padding: 2.5rem; text-align: center; color: var(--text2);
+    cursor: pointer; transition: all 0.2s;
+  }
+  .drop-zone:hover { border-color: #888; background: rgba(255,255,255,0.02); }
+  .drop-zone .drop-icon { font-size: 2rem; margin-bottom: 10px; }
+  /* MATH */
+  .math-block {
+    background: rgba(0,0,0,0.25); border: 1px solid var(--card-border);
+    border-radius: 10px; padding: 1.2rem 1.5rem; font-family: 'Courier New', monospace;
+    font-size: 14px; color: #b0d0ff; line-height: 2;
+    overflow-x: auto;
+  }
+  .math-coeff { color: var(--gold); font-weight: 600; }
+  .math-var { color: var(--teal); }
+  .math-op { color: #aaa; }
+  /* FOOTER */
+  footer {
+    background: rgba(0,0,0,0.2); border-top: 1px solid var(--card-border);
+    padding: 2.5rem 2rem; text-align: center;
+    font-size: 12px; color: var(--text2); line-height: 1.8;
+  }
+  /* TABS */
+  .tab-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 1.5rem; }
+  .tab-btn { padding: 7px 16px; border-radius: 20px; border: 1px solid var(--card-border); background: transparent; color: var(--text2); font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .tab-btn.active { background: rgba(200,200,200,0.1); border-color: #888; color: var(--accent2); }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+  /* DISCLAIMER */
+  .disclaimer {
+    font-size: 11.5px; color: var(--text2); background: rgba(255,255,255,0.02);
+    border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+    padding: 10px 14px; margin-top: 12px; line-height: 1.6;
+  }
+  .highlight-text { color: var(--accent2); }
+  /* CSV TABLE */
+  .csv-table-wrap { overflow-x: auto; margin-top: 1rem; }
+  .csv-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .csv-table th { background: rgba(61,142,248,0.1); color: var(--accent2); padding: 8px 12px; text-align: left; font-weight: 600; }
+  .csv-table td { padding: 7px 12px; border-bottom: 1px solid var(--card-border); color: var(--text); }
+  .csv-table tr:hover td { background: rgba(255,255,255,0.02); }
+  .dl-btn { padding: 8px 18px; border-radius: 8px; border: 1px solid #666; background: rgba(255,255,255,0.05); color: #ccc; font-size: 12px; cursor: pointer; transition: all 0.2s; }
+  .dl-btn:hover { background: rgba(255,255,255,0.1); }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <span class="brand">⚡ Wage Dynamics Explorer</span>
+  <a onclick="scrollTo('about')">About</a>
+  <a onclick="scrollTo('calc')">Calculator</a>
+  <a onclick="scrollTo('scenario')">Scenarios</a>
+  <a onclick="scrollTo('viz')">Visualizations</a>
+  <a onclick="scrollTo('regression')">Regression</a>
+  <a onclick="scrollTo('diagnostics')">Diagnostics</a>
+  <a onclick="scrollTo('csv')">CSV Upload</a>
+  <a onclick="scrollTo('math')">Model</a>
+</nav>
+
+<!-- HERO -->
+<div class="hero" id="top">
+  <div class="grid-bg"></div>
+  <h1>Econometric Wage Dynamics Explorer</h1>
+  <p>Interactive Analysis of Human Capital, Education, Experience, and Wage Determination in India — based on the Mincer Wage Equation.</p>
+  <div class="badge-row">
+    <span class="badge badge-blue">IHDS-II Dataset</span>
+    <span class="badge badge-gold">n = 5,000</span>
+    <span class="badge badge-teal">OLS Estimation</span>
+    <span class="badge badge-rose">HC1 Robust SE</span>
+    <span class="badge badge-blue">2011–12 Survey</span>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="sv">5.56%</div><div class="sl">Return per year of education</div></div>
+    <div class="stat-card"><div class="sv">42.0%</div><div class="sl">Male wage premium</div></div>
+    <div class="stat-card"><div class="sv">14.7%</div><div class="sl">Urban wage premium</div></div>
+    <div class="stat-card"><div class="sv">44.9 yrs</div><div class="sl">Peak experience</div></div>
+  </div>
+  <div style="margin-top:2rem;position:relative;z-index:1;">
+    <p style="font-size:13px;color:var(--text2);letter-spacing:0.04em;">Nikhil J Palakeel</p>
+    <p style="font-size:12px;margin-top:3px;"><a href="mailto:nikhiljoseph7500@gmail.com" style="color:rgba(200,200,200,0.4);text-decoration:none;letter-spacing:0.04em;">nikhiljoseph7500@gmail.com</a></p>
+  </div>
+  <div class="scroll-hint" style="margin-top:1.5rem;">↓ Explore the research</div>
+</div>
+
+<!-- ABOUT -->
+<hr class="section-divider">
+<section id="about">
+  <div class="section-label">Research Context</div>
+  <h2>The Mincer Wage Equation</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">A foundational model in labour economics, linking human capital to wage outcomes.</p>
+  <div class="card-grid-2" style="margin-bottom:1.5rem;">
+    <div class="concept-card">
+      <div class="concept-icon blue">🎓</div>
+      <div>
+        <h3>Human Capital Theory</h3>
+        <p style="font-size:13px;color:var(--text2);">Becker (1964) formalised the idea that individuals invest in education and training — just as firms invest in capital — to raise future earning capacity. Each additional year of schooling increases productivity and thus wages.</p>
+      </div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon gold">📈</div>
+      <div>
+        <h3>Returns to Experience</h3>
+        <p style="font-size:13px;color:var(--text2);">On-the-job learning raises productivity. However, returns diminish over time as human capital depreciates. The experience-squared term captures this inverted-U: wages rise rapidly early in career, then slow and eventually decline.</p>
+      </div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon rose">⚖️</div>
+      <div>
+        <h3>Gender Wage Gap</h3>
+        <p style="font-size:13px;color:var(--text2);">After controlling for education and experience, male workers in the IHDS-II sample earn approximately 42.0% more than female workers. This reflects occupational segregation and systematic wage discrimination in Indian labour markets.</p>
+      </div>
+    </div>
+    <div class="concept-card">
+      <div class="concept-icon teal">🏙️</div>
+      <div>
+        <h3>Urban–Rural Divide</h3>
+        <p style="font-size:13px;color:var(--text2);">Urban workers earn approximately 14.7% more than rural workers, reflecting higher labour productivity, sectoral composition, and cost-of-living differentials. Urbanisation significantly shapes India's wage structure.</p>
+      </div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:10px;">Why a semi-log model?</h3>
+    <p style="font-size:13px;color:var(--text2);">The Mincer equation regresses <em>ln(wage)</em> on human capital variables. This semi-logarithmic form is theoretically appropriate when the rate of return to each additional year of schooling is approximately constant — implying wages grow exponentially with schooling. The log transformation also reduces right-skewness in the wage distribution common in cross-sectional data.</p>
+    <div class="disclaimer" style="margin-top:12px;">
+      <strong>Dataset:</strong> India Human Development Survey-II (IHDS-II, 2011–12), conducted by the University of Maryland and NCAER. Working sample: <strong>5,000 wage-employed individuals</strong> with complete data on wages, education, age, gender, and urban/rural status. Parameters estimated via OLS with HC1 robust standard errors.
+    </div>
+  </div>
+</section>
+
+<!-- CALCULATOR -->
+<hr class="section-divider">
+<section id="calc">
+  <div class="section-label">Interactive Tool</div>
+  <h2>Wage Calculator</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">Adjust the parameters below to explore model-estimated wage associations under the Mincer specification.</p>
+  <div class="calc-grid">
+    <!-- INPUTS -->
+    <div class="card">
+      <h3 style="margin-bottom:1rem;">Human Capital Parameters</h3>
+      <div class="input-group">
+        <label>Years of Education <span id="edu-val">10</span></label>
+        <input type="range" id="edu" min="0" max="16" step="1" value="10" oninput="updateCalc()">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-top:3px;"><span>0 yrs</span><span>16 yrs</span></div>
+      </div>
+      <div class="input-group">
+        <label>Years of Experience <span id="exp-val">15</span></label>
+        <input type="range" id="exp" min="0" max="50" step="1" value="15" oninput="updateCalc()">
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-top:3px;"><span>0 yrs</span><span>50 yrs</span></div>
+      </div>
+      <div class="input-group">
+        <label>Gender</label>
+        <div class="toggle-row">
+          <button class="toggle-btn active" id="btn-male" onclick="setGender(1)">Male</button>
+          <button class="toggle-btn" id="btn-female" onclick="setGender(0)">Female</button>
+        </div>
+      </div>
+      <div class="input-group">
+        <label>Location</label>
+        <div class="toggle-row">
+          <button class="toggle-btn" id="btn-rural" onclick="setUrban(0)">Rural</button>
+          <button class="toggle-btn active" id="btn-urban" onclick="setUrban(1)">Urban</button>
+        </div>
+      </div>
+    </div>
+    <!-- OUTPUTS -->
+    <div>
+      <div class="output-primary">
+        <div class="label">Estimated 2026 Wage Equivalent</div>
+        <div class="wage" id="out-2026">₹0</div>
+        <div class="period" id="out-period">per hour · ₹0/month · ₹0/year</div>
+      </div>
+      <div class="output-secondary">
+        <div class="out-card">
+          <div class="ov" id="out-log">0.000</div>
+          <div class="ol">Predicted ln(Wage)</div>
+        </div>
+        <div class="out-card">
+          <div class="ov" id="out-hist">₹0</div>
+          <div class="ol">2011–12 Est. Wage (hourly)</div>
+        </div>
+        <div class="out-card">
+          <div class="ov" id="out-mult">3.8×</div>
+          <div class="ol">Inflation Adj. Multiplier</div>
+        </div>
+        <div class="out-card">
+          <div class="ov" id="out-annual">₹0</div>
+          <div class="ol">Est. Annual (2026)</div>
+        </div>
+      </div>
+      <!-- DECOMP -->
+      <div class="card" style="margin-top:14px;">
+        <h4 style="font-size:12px;color:var(--text2);margin-bottom:10px;">Coefficient Contribution Decomposition</h4>
+        <div id="decomp-items"></div>
+      </div>
+      <div class="interp-card" id="interp-box">
+        <p id="interp-text" style="font-size:12.5px;color:var(--muted);"></p>
+      </div>
+      <div class="disclaimer">Model-estimated wage predicted under the Mincer econometric specification using IHDS-II (2011–12) coefficients. 2026 values are inflation-adjusted approximations (CPI multiplier ≈ 3.8×) for interpretive purposes only. Not a precise salary forecast.</div>
+    </div>
+  </div>
+</section>
+
+<!-- SCENARIO -->
+<hr class="section-divider">
+<section id="scenario">
+  <div class="section-label">What-If Analysis</div>
+  <h2>Scenario Simulator</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">Compare estimated wage outcomes across different human capital and demographic scenarios.</p>
+  <div class="scenario-selector" id="sc-buttons"></div>
+  <div class="scenario-grid" id="sc-results"></div>
+  <div class="disclaimer" style="margin-top:1rem;">Scenarios compare model-estimated wages under the Mincer specification. Percentage differences reflect coefficient-implied structural relationships in the 2011–12 IHDS-II data, inflation-adjusted to approximate 2026 equivalents.</div>
+</section>
+
+<!-- VISUALIZATIONS -->
+<hr class="section-divider">
+<section id="viz">
+  <div class="section-label">Analytics Dashboard</div>
+  <h2>Wage Dynamics Visualizations</h2>
+  <div class="tab-row">
+    <button class="tab-btn active" onclick="showTab('t-edu')">Education & Wages</button>
+    <button class="tab-btn" onclick="showTab('t-exp')">Experience Curve</button>
+    <button class="tab-btn" onclick="showTab('t-gender')">Gender Gap</button>
+    <button class="tab-btn" onclick="showTab('t-urban')">Urban Premium</button>
+  </div>
+  <div id="t-edu" class="tab-panel active">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Returns to Education</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;">Each additional year of schooling is associated with ~5.56% higher wages. The gradient steepens at higher education levels due to the log-linear specification.</p>
+    </div>
+    <div class="chart-wrap" style="height:320px;"><canvas id="c-edu" role="img" aria-label="Line chart showing wage increasing with years of education">Wage rises with years of education, approximately 5.56% per year.</canvas></div>
+    <div style="display:flex;gap:16px;margin-top:10px;font-size:12px;color:var(--text2);">
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#3d8ef8;display:inline-block;"></span>Male Urban</span>
+      <span style="display:flex;align-items:center;gap:4px;"><span style="width:10px;height:10px;border-radius:2px;background:#e05c7a;display:inline-block;"></span>Female Rural</span>
+    </div>
+  </div>
+  <div id="t-exp" class="tab-panel">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Inverted-U Experience–Wage Profile</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;">Returns to experience follow an inverted-U. Wages peak at approximately <strong style="color:var(--gold)">44.9 years</strong> of experience (β₂=0.0359, β₃=−0.0004), after which the negative experience-squared term dominates — consistent with human capital depreciation.</p>
+    </div>
+    <div class="chart-wrap" style="height:320px;"><canvas id="c-exp" role="img" aria-label="Line chart showing inverted-U experience wage profile peaking at 44.9 years">Wages peak at approximately 44.9 years of experience.</canvas></div>
+  </div>
+  <div id="t-gender" class="tab-panel">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Gender Wage Gap</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;">Male workers earn an estimated <strong style="color:var(--accent2)">42.0%</strong> wage premium over female workers (e<sup>0.3510</sup>−1). This reflects occupational segregation and systematic discrimination — not differences in education or experience.</p>
+    </div>
+    <div class="chart-wrap" style="height:320px;"><canvas id="c-gender" role="img" aria-label="Bar chart comparing male and female estimated wages">Male workers earn approximately 42% more than female workers.</canvas></div>
+  </div>
+  <div id="t-urban" class="tab-panel">
+    <div class="card" style="margin-bottom:12px;">
+      <h3>Urban–Rural Wage Premium</h3>
+      <p style="font-size:12px;color:var(--text2);margin-bottom:1rem;">Urban workers earn an estimated <strong style="color:var(--teal)">14.7%</strong> premium over rural workers (e<sup>0.1368</sup>−1), reflecting higher productivity, sectoral composition, and agglomeration effects in urban labour markets.</p>
+    </div>
+    <div class="chart-wrap" style="height:320px;"><canvas id="c-urban" role="img" aria-label="Bar chart comparing urban and rural estimated wages">Urban workers earn approximately 14.7% more than rural workers.</canvas></div>
+  </div>
+</section>
+
+<!-- REGRESSION -->
+<hr class="section-divider">
+<section id="regression">
+  <div class="section-label">Econometric Results</div>
+  <h2>OLS Regression Results</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">Full model (Model 4) with HC1 heteroskedasticity-robust standard errors. All coefficients significant at the 1% level.</p>
+  <div class="card-grid-3" style="margin-bottom:1.5rem;">
+    <div class="coeff-card">
+      <div class="cname">Intercept (β₀)</div>
+      <div class="cval" style="color:#aaa;">1.9069</div>
+      <div class="cstat">t = 45.11 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:60%;background:#555;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">Baseline log wage</div>
+    </div>
+    <div class="coeff-card">
+      <div class="cname">Education (β₁)</div>
+      <div class="cval" style="color:var(--accent2);">0.0556</div>
+      <div class="cstat">t = 20.80 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:70%;background:#3d8ef8;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">+5.56% per year of schooling</div>
+    </div>
+    <div class="coeff-card">
+      <div class="cname">Experience (β₂)</div>
+      <div class="cval" style="color:var(--teal);">0.0359</div>
+      <div class="cstat">t = 17.44 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:56%;background:#2bbfa4;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">+3.59% per year of experience</div>
+    </div>
+    <div class="coeff-card">
+      <div class="cname">Experience² (β₃)</div>
+      <div class="cval" style="color:var(--rose);">−0.0004</div>
+      <div class="cstat">t = −13.10 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:42%;background:#e05c7a;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">Diminishing returns; peak at 44.9 yrs</div>
+    </div>
+    <div class="coeff-card">
+      <div class="cname">Male Dummy (β₄)</div>
+      <div class="cval" style="color:var(--gold);">0.3510</div>
+      <div class="cstat">t = 15.39 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:85%;background:#f0a500;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">≈ 42.0% gender wage premium</div>
+    </div>
+    <div class="coeff-card">
+      <div class="cname">Urban Dummy (β₅)</div>
+      <div class="cval" style="color:#a78bfa;">0.1368</div>
+      <div class="cstat">t = 6.36 <span class="sig-star">***</span></div>
+      <div class="cbar-wrap"><div class="cbar" style="width:32%;background:#a78bfa;"></div></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:6px;">≈ 14.7% urban wage premium</div>
+    </div>
+  </div>
+  <div class="card-grid-3">
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.4rem;font-weight:700;color:var(--accent2);">0.2013</div>
+      <div style="font-size:12px;color:var(--text2);">R²</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.4rem;font-weight:700;color:var(--accent2);">0.2005</div>
+      <div style="font-size:12px;color:var(--text2);">Adjusted R²</div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div style="font-size:1.4rem;font-weight:700;color:var(--gold);">214.59***</div>
+      <div style="font-size:12px;color:var(--text2);">F-statistic (Wald)</div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:16px;">
+    <h3 style="margin-bottom:8px;">On the Adjusted R² of 0.2005</h3>
+    <p style="font-size:13px;color:var(--text2);">The model explains approximately <strong style="color:var(--accent2)">20.1%</strong> of variation in log wages. This is consistent with cross-sectional labour economics wage regressions in the literature — Dutta (2006) and Psacharopoulos & Patrinos (2004) report typical R² values of 0.15–0.30 in individual-level earnings data. Wages are influenced by numerous unobserved factors: occupation, industry, caste, firm size, networks, and innate ability. Labour economics models prioritise <em>coefficient interpretation</em> and <em>structural relationships</em> over prediction precision. The joint F-statistic of 214.59 (p &lt; 0.001) confirms strong overall explanatory power.</p>
+  </div>
+</section>
+
+<!-- DIAGNOSTICS -->
+<hr class="section-divider">
+<section id="diagnostics">
+  <div class="section-label">Model Reliability</div>
+  <h2>Diagnostics & Model Validity</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">Four CLRM assumption tests conducted on full model residuals. Where violations occur, appropriate corrections have been applied.</p>
+  <div class="card-grid-2" style="margin-bottom:1rem;">
+    <div class="diag-card">
+      <div class="diag-header">
+        <div><h3>Jarque-Bera Test</h3><div style="font-size:12px;color:var(--text2);">Normality of Residuals · JB = 1,262.0</div></div>
+        <span class="diag-status status-viol">Violated</span>
+      </div>
+      <div class="diag-toggle" onclick="toggleDiag('jb')">▸ Interpretation</div>
+      <div class="diag-exp" id="jb">p &lt; 0.001 indicates significant non-normality. This is common in large cross-sectional wage datasets. With n = 5,000, the Central Limit Theorem ensures OLS estimators remain approximately normally distributed, so inference remains valid. No corrective action required at this sample size.</div>
+    </div>
+    <div class="diag-card">
+      <div class="diag-header">
+        <div><h3>VIF Analysis</h3><div style="font-size:12px;color:var(--text2);">Multicollinearity · Edu: 1.55 · Exp: 12.25 · Exp²: 11.65</div></div>
+        <span class="diag-status status-warn">Moderate (Expected)</span>
+      </div>
+      <div class="diag-toggle" onclick="toggleDiag('vif')">▸ Interpretation</div>
+      <div class="diag-exp" id="vif">Education, Male, and Urban VIFs &lt; 2.0 — well within acceptable bounds. High VIF for Experience/Experience² (12.25/11.65) is structurally expected: Exp² is a mathematical function of Exp. This polynomial multicollinearity inflates standard errors for experience coefficients, but high t-statistics (17.44 and −13.10) confirm adequate estimation precision. Not a concern for inference.</div>
+    </div>
+    <div class="diag-card">
+      <div class="diag-header">
+        <div><h3>Breusch-Pagan Test</h3><div style="font-size:12px;color:var(--text2);">Homoskedasticity · LM = 177.94</div></div>
+        <span class="diag-status status-viol">Violated → Corrected</span>
+      </div>
+      <div class="diag-toggle" onclick="toggleDiag('bp')">▸ Interpretation</div>
+      <div class="diag-exp" id="bp">p &lt; 0.001 strongly rejects homoskedasticity. Heteroskedasticity is common in wage regressions: earnings variance differs across education and experience levels. While this does not bias coefficients, it renders conventional standard errors inconsistent. Corrected by applying HC1 (Eicker-Huber-White) heteroskedasticity-robust standard errors throughout — ensuring valid t-statistics and F-statistic.</div>
+    </div>
+    <div class="diag-card">
+      <div class="diag-header">
+        <div><h3>Breusch-Godfrey LM Test</h3><div style="font-size:12px;color:var(--text2);">Serial Dependence · LM = 157.95</div></div>
+        <span class="diag-status status-warn">Contextual</span>
+      </div>
+      <div class="diag-toggle" onclick="toggleDiag('bg')">▸ Interpretation</div>
+      <div class="diag-exp" id="bg">p &lt; 0.001 rejects no serial dependence. In a cross-sectional dataset, this most plausibly reflects household/village-level clustering in the IHDS-II survey design, or omitted group-level variables — not true time-series autocorrelation (IHDS-II has no temporal ordering). This reinforces the case for cluster-robust standard errors in future work. The HC1 correction applied here provides a conservative improvement over naive OLS inference.</div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:10px;">Limitations & Transparency</h3>
+    <div class="card-grid-2" style="gap:10px;">
+      <div style="font-size:12.5px;color:var(--text2);padding:10px;border:1px solid var(--card-border);border-radius:8px;">
+        <strong style="color:var(--text);">⚠ Experience Proxy</strong><br>Potential experience (Age − Education − 6) may contain measurement error, especially for women with interrupted careers.
+      </div>
+      <div style="font-size:12.5px;color:var(--text2);padding:10px;border:1px solid var(--card-border);border-radius:8px;">
+        <strong style="color:var(--text);">⚠ Omitted Variables</strong><br>Caste, occupation, industry, firm size are excluded. May introduce omitted variable bias in education/experience coefficients.
+      </div>
+      <div style="font-size:12.5px;color:var(--text2);padding:10px;border:1px solid var(--card-border);border-radius:8px;">
+        <strong style="color:var(--text);">⚠ No Causal Identification</strong><br>Cross-sectional data cannot establish causality. Education coefficients capture conditional correlations, not causal returns. IV methods required for causal inference.
+      </div>
+      <div style="font-size:12.5px;color:var(--text2);padding:10px;border:1px solid var(--card-border);border-radius:8px;">
+        <strong style="color:var(--text);">⚠ Sample Restriction</strong><br>Sample restricted to wage employees. Self-employed workers (a large share of India's labour force) are excluded. Results may not generalise to all workers.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CSV UPLOAD -->
+<hr class="section-divider">
+<section id="csv">
+  <div class="section-label">Custom Analysis</div>
+  <h2>CSV Upload & Batch Prediction</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">Upload a CSV with columns: <code style="color:var(--accent2);font-size:12px;">education, experience, male (0/1), urban (0/1)</code> to generate batch wage estimates.</p>
+  <div class="drop-zone" id="dropzone" onclick="document.getElementById('csvfile').click()" ondragover="event.preventDefault();this.style.borderColor='var(--accent)'" ondragleave="this.style.borderColor=''" ondrop="handleDrop(event)">
+    <div class="drop-icon">📂</div>
+    <p style="font-weight:600;">Drop CSV file here or click to browse</p>
+    <p style="font-size:12px;margin-top:4px;">Required columns: education, experience, male, urban</p>
+    <input type="file" id="csvfile" accept=".csv" style="display:none" onchange="handleFile(event)">
+  </div>
+  <div id="csv-output" style="margin-top:1.5rem;display:none;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+      <h3 id="csv-summary"></h3>
+      <button class="dl-btn" onclick="downloadCSV()">↓ Download Results</button>
+    </div>
+    <div class="csv-table-wrap"><table class="csv-table" id="csv-table"><thead></thead><tbody></tbody></table></div>
+    <div class="chart-wrap" style="height:280px;margin-top:1.5rem;"><canvas id="c-csv" role="img" aria-label="Bar chart of predicted wages from uploaded CSV">Predicted wages from uploaded data.</canvas></div>
+  </div>
+</section>
+
+<!-- MATH -->
+<hr class="section-divider">
+<section id="math">
+  <div class="section-label">Mathematical Specification</div>
+  <h2>The Econometric Model</h2>
+  <p style="color:var(--text2);margin-bottom:1.5rem;font-size:14px;">The full Mincer wage equation estimated on IHDS-II data (Model 4 — full specification).</p>
+  <div class="math-block">
+    <span class="math-var">ln(Wageᵢ)</span> <span class="math-op"> = </span>
+    <span class="math-coeff">1.9069</span>
+    <span class="math-op"> + </span><span class="math-coeff">0.0556</span> · <span class="math-var">Educationᵢ</span>
+    <span class="math-op"> + </span><span class="math-coeff">0.0359</span> · <span class="math-var">Experienceᵢ</span>
+    <span class="math-op"> − </span><span class="math-coeff">0.0004</span> · <span class="math-var">Experienceᵢ²</span>
+    <span class="math-op"> + </span><span class="math-coeff">0.3510</span> · <span class="math-var">Maleᵢ</span>
+    <span class="math-op"> + </span><span class="math-coeff">0.1368</span> · <span class="math-var">Urbanᵢ</span>
+    <span class="math-op"> + </span><span class="math-var">uᵢ</span>
+  </div>
+  <div class="card-grid-2" style="margin-top:1.5rem;">
+    <div class="card">
+      <h3>Wage-Maximising Experience</h3>
+      <div class="math-block" style="margin-top:10px;font-size:13px;">
+        ∂ln(W)/∂Exp = β₂ + 2β₃·Exp = 0<br>
+        Exp* = −β₂ / (2β₃)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; = −0.0359 / (2 × −0.0004)<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; ≈ <span class="math-coeff">44.9 years</span>
+      </div>
+      <p style="font-size:12px;color:var(--text2);margin-top:10px;">Beyond 44.9 years of experience, the negative experience-squared term dominates and wages decline — consistent with human capital depreciation in the Mincer framework.</p>
+    </div>
+    <div class="card">
+      <h3>Exact Dummy Variable Premiums</h3>
+      <div class="math-block" style="margin-top:10px;font-size:13px;">
+        % Difference = (e^β − 1) × 100<br><br>
+        Male premium:<br>
+        (e^<span class="math-coeff">0.3510</span> − 1) × 100 ≈ <span class="math-coeff">42.0%</span><br><br>
+        Urban premium:<br>
+        (e^<span class="math-coeff">0.1368</span> − 1) × 100 ≈ <span class="math-coeff">14.7%</span>
+      </div>
+    </div>
+  </div>
+  <div class="card" style="margin-top:1.5rem;">
+    <h3 style="margin-bottom:8px;">Log-linear interpretation</h3>
+    <p style="font-size:13px;color:var(--text2);">In the semi-log specification, the coefficient on a continuous regressor gives the approximate proportional change in wages for a one-unit increase. For example, β₁ = 0.0556 implies that one additional year of schooling is associated with approximately 5.56% higher hourly wages, holding all else constant. For binary dummy variables, the exact percentage differential requires the exponential transformation: (e^β − 1) × 100%.</p>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <p style="font-weight:600;color:var(--accent2);margin-bottom:8px;">Econometric Wage Dynamics Explorer</p>
+  <p><em>"An Econometric Analysis of the Mincer Wage Equation: The Association of Education and Experience with Wages in India"</em></p>
+  <p style="margin-top:6px;">Nikhil J Palakeel & Dhruv Aryan · BA Programme · St Stephen's College · Basic Econometrics ECON24</p>
+  <p style="margin-top:12px;max-width:700px;margin-left:auto;margin-right:auto;color:var(--text2);">
+    This tool provides econometric model-based wage estimates derived from IHDS-II (2011–12) survey data and inflation-adjusted approximations for interpretive purposes. The model is designed primarily to explore wage determinants and relative economic relationships rather than provide precise salary forecasts. Actual wages depend on numerous additional factors including occupation, industry, geography, skills, labour market conditions, macroeconomic change, and unobserved individual characteristics. This tool is intended for educational and analytical purposes only.
+  </p>
+  <p style="margin-top:10px;font-size:11px;color:rgba(180,200,230,0.4);">
+    Dataset: IHDS-II (NCAER & University of Maryland, 2012) · OLS with HC1 Robust Standard Errors · Adj. R² = 0.2005 · n = 5,000
+  </p>
+</footer>
+
+<script>
+// ─── GLOBAL STATE ───
+let genderVal = 1, urbanVal = 1;
+let csvData = [];
+
+// ─── HELPERS ───
+function scrollTo(id){ document.getElementById(id)?.scrollIntoView({behavior:'smooth',block:'start'}); }
+
+function mincerLnWage(edu, exp, male, urban){
+  return 1.9069 + 0.0556*edu + 0.0359*exp - 0.0004*exp*exp + 0.3510*male + 0.1368*urban;
+}
+function histWage(lnW){ return Math.exp(lnW); }
+function w2026(h){ return h * 3.8; }
+
+// ─── CALCULATOR ───
+function setGender(v){
+  genderVal = v;
+  document.getElementById('btn-male').classList.toggle('active', v===1);
+  document.getElementById('btn-female').classList.toggle('active', v===0);
+  updateCalc();
+}
+function setUrban(v){
+  urbanVal = v;
+  document.getElementById('btn-urban').classList.toggle('active', v===1);
+  document.getElementById('btn-rural').classList.toggle('active', v===0);
+  updateCalc();
+}
+
+function fmt(n){ return '₹' + n.toLocaleString('en-IN', {maximumFractionDigits:0}); }
+
+function updateCalc(){
+  const edu = +document.getElementById('edu').value;
+  const exp = +document.getElementById('exp').value;
+  document.getElementById('edu-val').textContent = edu;
+  document.getElementById('exp-val').textContent = exp;
+
+  const lnW = mincerLnWage(edu, exp, genderVal, urbanVal);
+  const hist = histWage(lnW);
+  const adj = w2026(hist);
+  const monthly = adj * 8 * 25;
+  const annual = monthly * 12;
+
+  document.getElementById('out-2026').textContent = fmt(adj) + '/hr';
+  document.getElementById('out-period').textContent = `per hour · ${fmt(monthly)}/month · ${fmt(annual)}/year`;
+  document.getElementById('out-log').textContent = lnW.toFixed(3);
+  document.getElementById('out-hist').textContent = fmt(hist);
+  document.getElementById('out-mult').textContent = '3.8×';
+  document.getElementById('out-annual').textContent = fmt(annual);
+
+  // DECOMP
+  const parts = [
+    { label:'Intercept (baseline)', val: 1.9069, color:'#555' },
+    { label:`Education (${edu} yrs × 0.0556)`, val: 0.0556*edu, color:'#3d8ef8' },
+    { label:`Experience (${exp} yrs, quadratic)`, val: 0.0359*exp - 0.0004*exp*exp, color:'#2bbfa4' },
+    { label:`Gender premium (${genderVal?'Male':'Female'})`, val: 0.3510*genderVal, color:'#f0a500' },
+    { label:`Location (${urbanVal?'Urban':'Rural'})`, val: 0.1368*urbanVal, color:'#a78bfa' },
+  ];
+  const total = parts.reduce((s,p)=>s+p.val,0);
+  document.getElementById('decomp-items').innerHTML = parts.map(p => {
+    const pct = total > 0 ? Math.max(0,(p.val/total)*100) : 0;
+    return `<div style="margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:3px;">
+        <span>${p.label}</span><span style="color:var(--text);">${p.val.toFixed(4)}</span>
+      </div>
+      <div class="decomp-bar"><div class="decomp-fill" style="width:${pct.toFixed(1)}%;background:${p.color};"></div></div>
+    </div>`;
+  }).join('');
+
+  // INTERPRETATION
+  const eduEffect = ((Math.exp(0.0556)-1)*100).toFixed(1);
+  const expPeak = 44.9;
+  const expStatus = exp < expPeak ? `Experience is still on the rising portion of the career curve.` : `Experience has passed the wage-maximising point of ~44.9 years.`;
+  document.getElementById('interp-text').innerHTML =
+    `Each additional year of education is associated with ~<strong style="color:var(--accent2)">5.56%</strong> higher estimated wages. ` +
+    `${genderVal?'The male wage premium is approximately <strong style="color:var(--gold)">42.0%</strong>.':'Female workers face a wage disadvantage of approximately 42.0% relative to male workers.'} ` +
+    `${urbanVal?'The urban wage premium is approximately <strong style="color:#5cd8c2">14.7%</strong>.':'Rural location is associated with approximately 14.7% lower wages relative to urban.'} ` +
+    expStatus;
+}
+
+// ─── SCENARIO SIMULATOR ───
+const scenarios = [
+  { label:'8 vs 16 yrs education', a:{edu:8,exp:15,male:1,urban:0,tag:'8 yrs edu'}, b:{edu:16,exp:15,male:1,urban:0,tag:'16 yrs edu'} },
+  { label:'Rural vs Urban', a:{edu:10,exp:15,male:1,urban:0,tag:'Rural'}, b:{edu:10,exp:15,male:1,urban:1,tag:'Urban'} },
+  { label:'Male vs Female', a:{edu:10,exp:15,male:0,urban:1,tag:'Female'}, b:{edu:10,exp:15,male:1,urban:1,tag:'Male'} },
+  { label:'Low vs High experience', a:{edu:10,exp:5,male:1,urban:1,tag:'5 yrs exp'}, b:{edu:10,exp:30,male:1,urban:1,tag:'30 yrs exp'} },
+  { label:'No edu vs University', a:{edu:0,exp:15,male:1,urban:0,tag:'No education'}, b:{edu:16,exp:15,male:1,urban:1,tag:'University (urban)'} },
+];
+let activeScenario = 0;
+
+function buildScenarios(){
+  document.getElementById('sc-buttons').innerHTML = scenarios.map((s,i)=>
+    `<button class="sc-btn${i===0?' active':''}" onclick="selectScenario(${i})">${s.label}</button>`
+  ).join('');
+  renderScenario(0);
+}
+
+function selectScenario(i){
+  activeScenario = i;
+  document.querySelectorAll('.sc-btn').forEach((b,j)=>b.classList.toggle('active',j===i));
+  renderScenario(i);
+}
+
+function renderScenario(i){
+  const s = scenarios[i];
+  const wA = w2026(histWage(mincerLnWage(s.a.edu,s.a.exp,s.a.male,s.a.urban)));
+  const wB = w2026(histWage(mincerLnWage(s.b.edu,s.b.exp,s.b.male,s.b.urban)));
+  const diff = ((wB-wA)/wA*100).toFixed(1);
+  const pos = wB >= wA;
+  document.getElementById('sc-results').innerHTML = `
+    <div class="scenario-card">
+      <h4>Scenario A · ${s.a.tag}</h4>
+      <div class="sw">${fmt(wA)}/hr</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;">${fmt(wA*8*25)}/month (est. 2026)</div>
+    </div>
+    <div class="scenario-card">
+      <h4>Scenario B · ${s.b.tag}</h4>
+      <div class="sw">${fmt(wB)}/hr</div>
+      <div style="font-size:12px;color:var(--text2);margin-top:4px;">${fmt(wB*8*25)}/month (est. 2026)</div>
+      <span class="diff-badge ${pos?'diff-pos':'diff-neg'}">${pos?'+':''}${diff}% vs Scenario A</span>
+    </div>
+  `;
+}
+
+// ─── TABS ───
+function showTab(id){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// ─── CHARTS ───
+let charts = {};
+function makeCharts(){
+  // EDU CHART
+  const eduLabels = Array.from({length:17},(_,i)=>i);
+  const wMU = eduLabels.map(e=> w2026(histWage(mincerLnWage(e,15,1,1))));
+  const wFR = eduLabels.map(e=> w2026(histWage(mincerLnWage(e,15,0,0))));
+  charts.edu = new Chart(document.getElementById('c-edu'),{
+    type:'line',
+    data:{labels:eduLabels,datasets:[
+      {label:'Male Urban',data:wMU,borderColor:'#aaaaaa',backgroundColor:'rgba(170,170,170,0.06)',tension:0.4,pointRadius:3},
+      {label:'Female Rural',data:wFR,borderColor:'#aa7878',backgroundColor:'rgba(170,120,120,0.06)',tension:0.4,pointRadius:3,borderDash:[5,4]},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${Math.round(c.raw).toLocaleString('en-IN')}/hr (2026 est.)`}}},scales:{x:{title:{display:true,text:'Years of Education',color:'rgba(180,200,230,0.6)',font:{size:11}},ticks:{color:'rgba(180,200,230,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},y:{title:{display:true,text:'2026 Est. Wage (₹/hr)',color:'rgba(180,200,230,0.6)',font:{size:11}},ticks:{color:'rgba(180,200,230,0.6)',callback:v=>'₹'+Math.round(v).toLocaleString('en-IN')},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+
+  // EXP CHART
+  const expLabels = Array.from({length:56},(_,i)=>i);
+  const wExp = expLabels.map(e=> w2026(histWage(mincerLnWage(10,e,1,1))));
+  const peakIdx = 45;
+  charts.exp = new Chart(document.getElementById('c-exp'),{
+    type:'line',
+    data:{labels:expLabels,datasets:[
+      {label:'ln(Wage) Profile',data:wExp,borderColor:'#7aaa96',backgroundColor:'rgba(122,170,150,0.06)',tension:0.4,pointRadius:0},
+      {label:'Peak',data:expLabels.map((e,i)=>i===peakIdx?wExp[peakIdx]:null),borderColor:'#b8a070',backgroundColor:'#b8a070',pointRadius:expLabels.map((e,i)=>i===peakIdx?7:0),showLine:false},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${Math.round(c.raw).toLocaleString('en-IN')}/hr`}},annotation:{}},scales:{x:{title:{display:true,text:'Years of Experience',color:'rgba(180,200,230,0.6)',font:{size:11}},ticks:{color:'rgba(180,200,230,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},y:{title:{display:true,text:'2026 Est. Wage (₹/hr)',color:'rgba(180,200,230,0.6)',font:{size:11}},ticks:{color:'rgba(180,200,230,0.6)',callback:v=>'₹'+Math.round(v).toLocaleString('en-IN')},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+
+  // GENDER CHART
+  const gCtx = document.getElementById('c-gender');
+  const gEdu = [4,8,12,16];
+  const gMale = gEdu.map(e=>w2026(histWage(mincerLnWage(e,15,1,1))));
+  const gFemale = gEdu.map(e=>w2026(histWage(mincerLnWage(e,15,0,1))));
+  charts.gender = new Chart(gCtx,{
+    type:'bar',
+    data:{labels:gEdu.map(e=>e+' yrs edu'),datasets:[
+      {label:'Male',data:gMale,backgroundColor:'rgba(184,160,112,0.6)',borderColor:'#b8a070',borderWidth:1},
+      {label:'Female',data:gFemale,backgroundColor:'rgba(170,120,120,0.5)',borderColor:'#aa7878',borderWidth:1},
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${Math.round(c.raw).toLocaleString('en-IN')}/hr (2026 est.)`}}},scales:{x:{ticks:{color:'rgba(180,200,230,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(180,200,230,0.6)',callback:v=>'₹'+Math.round(v).toLocaleString('en-IN')},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+
+  // URBAN CHART
+  const uData = [
+    {label:'Rural Female',val:w2026(histWage(mincerLnWage(10,15,0,0))),c:'rgba(170,120,120,0.55)'},
+    {label:'Rural Male',val:w2026(histWage(mincerLnWage(10,15,1,0))),c:'rgba(150,150,150,0.55)'},
+    {label:'Urban Female',val:w2026(histWage(mincerLnWage(10,15,0,1))),c:'rgba(122,170,150,0.6)'},
+    {label:'Urban Male',val:w2026(histWage(mincerLnWage(10,15,1,1))),c:'rgba(184,160,112,0.65)'},
+  ];
+  charts.urban = new Chart(document.getElementById('c-urban'),{
+    type:'bar',
+    data:{labels:uData.map(d=>d.label),datasets:[{label:'Est. 2026 Wage',data:uData.map(d=>d.val),backgroundColor:uData.map(d=>d.c),borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`₹${Math.round(c.raw).toLocaleString('en-IN')}/hr (2026 est.)`}}},scales:{x:{ticks:{color:'rgba(180,200,230,0.6)'},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(180,200,230,0.6)',callback:v=>'₹'+Math.round(v).toLocaleString('en-IN')},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+}
+
+// ─── DIAGNOSTICS TOGGLE ───
+function toggleDiag(id){
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+}
+
+// ─── CSV UPLOAD ───
+function handleDrop(e){
+  e.preventDefault();
+  document.getElementById('dropzone').style.borderColor='';
+  const file = e.dataTransfer.files[0];
+  if(file) processCSV(file);
+}
+function handleFile(e){ processCSV(e.target.files[0]); }
+
+function processCSV(file){
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const lines = e.target.result.trim().split('\n');
+    const headers = lines[0].toLowerCase().split(',').map(h=>h.trim());
+    const eduIdx = headers.findIndex(h=>h.includes('educ'));
+    const expIdx = headers.findIndex(h=>h.includes('exp'));
+    const maleIdx = headers.findIndex(h=>h.includes('male')||h.includes('gender'));
+    const urbanIdx = headers.findIndex(h=>h.includes('urban'));
+    if(eduIdx<0||expIdx<0){
+      alert('Could not detect education/experience columns. Please ensure columns are labelled "education" and "experience".');
+      return;
+    }
+    csvData = [];
+    for(let i=1;i<Math.min(lines.length,101);i++){
+      const cols = lines[i].split(',').map(c=>c.trim());
+      const edu = parseFloat(cols[eduIdx])||0;
+      const exp = parseFloat(cols[expIdx])||0;
+      const male = maleIdx>=0 ? (parseFloat(cols[maleIdx])||0) : 1;
+      const urban = urbanIdx>=0 ? (parseFloat(cols[urbanIdx])||0) : 1;
+      const lnW = mincerLnWage(edu,exp,male,urban);
+      const hist = histWage(lnW);
+      const adj = w2026(hist);
+      csvData.push({edu,exp,male,urban,lnW:lnW.toFixed(3),hist:Math.round(hist),adj:Math.round(adj),monthly:Math.round(adj*8*25)});
+    }
+    renderCSV(file.name, lines.length-1);
+  };
+  reader.readAsText(file);
+}
+
+function renderCSV(name, total){
+  document.getElementById('csv-output').style.display='block';
+  document.getElementById('csv-summary').textContent = `${Math.min(total,100)} rows processed from "${name}"`;
+  const thead = document.querySelector('#csv-table thead');
+  const tbody = document.querySelector('#csv-table tbody');
+  thead.innerHTML = '<tr><th>#</th><th>Education</th><th>Experience</th><th>Gender</th><th>Location</th><th>ln(Wage)</th><th>2011–12 Wage</th><th>2026 Est. Wage</th><th>Monthly (2026)</th></tr>';
+  tbody.innerHTML = csvData.map((r,i)=>`<tr>
+    <td>${i+1}</td><td>${r.edu}</td><td>${r.exp}</td>
+    <td>${r.male?'Male':'Female'}</td><td>${r.urban?'Urban':'Rural'}</td>
+    <td>${r.lnW}</td><td>₹${r.hist.toLocaleString('en-IN')}</td>
+    <td style="color:var(--accent2);font-weight:600;">₹${r.adj.toLocaleString('en-IN')}</td>
+    <td>₹${r.monthly.toLocaleString('en-IN')}</td>
+  </tr>`).join('');
+
+  if(charts.csv) charts.csv.destroy();
+  charts.csv = new Chart(document.getElementById('c-csv'),{
+    type:'bar',
+    data:{labels:csvData.map((_,i)=>'Row '+(i+1)),    datasets:[{label:'2026 Est. Wage (₹/hr)',data:csvData.map(r=>r.adj),backgroundColor:'rgba(150,150,150,0.5)',borderColor:'#888',borderWidth:1}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{ticks:{color:'rgba(180,200,230,0.6)',maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'rgba(180,200,230,0.6)',callback:v=>'₹'+v},grid:{color:'rgba(255,255,255,0.04)'}}}}
+  });
+}
+
+function downloadCSV(){
+  if(!csvData.length) return;
+  const rows = ['Education,Experience,Male,Urban,LnWage,Hist2012Wage,Adj2026Wage,Monthly2026']
+    .concat(csvData.map(r=>`${r.edu},${r.exp},${r.male},${r.urban},${r.lnW},${r.hist},${r.adj},${r.monthly}`));
+  const blob = new Blob([rows.join('\n')],{type:'text/csv'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='mincer_predictions.csv'; a.click();
+}
+
+// ─── INIT ───
+window.addEventListener('load',()=>{
+  updateCalc();
+  buildScenarios();
+  makeCharts();
+});
+</script>
+</body>
+</html>
